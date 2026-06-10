@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>EchoME 체험판 — AI 대화 태도·자세 분석</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EAF1FB; --card:#FFFFFF; --ink:#15233F; --sub:#5B6B8C;
+  --primary:#2563EB; --primary-2:#4F8BFF; --soft:#E3EDFF;
+  --posture:#16A34A; --posture-bg:#E7F6EE;
+  --lang:#7C3AED;    --lang-bg:#F1EAFD;
+  --behavior:#EA580C;--behavior-bg:#FDEEE3;
+  --line:#DCE6F5; --danger:#DC2626;
+  --r:18px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:'Noto Sans KR',-apple-system,sans-serif;
+  background:linear-gradient(160deg,#DCE9FB 0%,#EAF1FB 40%,#F3F7FD 100%);
+  color:var(--ink); display:flex; justify-content:center;
+}
+.shell{width:100%;max-width:430px;min-height:100vh;display:flex;flex-direction:column;padding:0 18px 28px;position:relative}
+.screen{display:none;flex:1;flex-direction:column;animation:fadein .35s ease}
+.screen.active{display:flex}
+@keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 2px 10px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:900;font-size:20px;letter-spacing:-.5px}
+.logo .me{color:var(--primary)}
+.logo-mark{width:30px;height:30px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--primary-2));display:grid;place-items:center;color:#fff;flex-shrink:0}
+.logo-mark svg{width:17px;height:17px}
+.trial-tag{font-size:11px;font-weight:800;background:#FFF3D6;color:#B45309;border-radius:999px;padding:4px 10px}
+.points-chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--primary);display:flex;align-items:center;gap:5px}
+.eyebrow{font-size:12px;font-weight:700;color:var(--primary);letter-spacing:.12em;margin-bottom:6px}
+h1{font-size:26px;font-weight:900;line-height:1.3;letter-spacing:-.5px}
+h2{font-size:17px;font-weight:800;letter-spacing:-.3px}
+.sub{color:var(--sub);font-size:14px;line-height:1.6;margin-top:8px}
+
+.echo-wrap{position:relative;display:grid;place-items:center;margin:30px auto 24px;width:170px;height:170px}
+.echo-ring{position:absolute;inset:0;border-radius:50%;border:2px solid var(--primary);opacity:0;animation:echo 2.8s ease-out infinite}
+.echo-ring:nth-child(2){animation-delay:.9s}
+.echo-ring:nth-child(3){animation-delay:1.8s}
+@keyframes echo{0%{transform:scale(.55);opacity:.55}100%{transform:scale(1.15);opacity:0}}
+.echo-core{width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-2));display:grid;place-items:center;color:#fff;box-shadow:0 14px 30px rgba(37,99,235,.35);z-index:1}
+.echo-core svg{width:44px;height:44px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:0 4px 16px rgba(21,35,63,.05)}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;border-radius:16px;padding:16px;font-family:inherit;font-size:16px;font-weight:800;cursor:pointer;transition:transform .12s, opacity .12s}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-2));color:#fff;box-shadow:0 10px 22px rgba(37,99,235,.3)}
+.btn-ghost{background:#fff;border:1.5px solid var(--line);color:var(--ink)}
+.btn:disabled{opacity:.45;cursor:default;transform:none}
+.btn:focus-visible{outline:3px solid rgba(37,99,235,.5);outline-offset:2px}
+.step-row{display:flex;gap:8px;margin-top:22px}
+.step-pill{flex:1;background:#fff;border:1px solid var(--line);border-radius:14px;padding:11px 8px;text-align:center}
+.step-pill .s-ic{font-size:19px}
+.step-pill .s-tx{font-size:11.5px;font-weight:700;color:var(--sub);margin-top:4px;line-height:1.35}
+
+.question-card{background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff;border-radius:var(--r);padding:16px 18px;margin-top:14px}
+.question-card .q-label{font-size:11.5px;font-weight:700;opacity:.85;letter-spacing:.08em;display:flex;align-items:center;gap:6px}
+.q-dot{width:7px;height:7px;border-radius:50%;background:#7EF0C2;animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.3}}
+.question-card .q-text{font-size:16.5px;font-weight:800;margin-top:7px;line-height:1.45}
+.cam-frame{position:relative;margin-top:14px;border-radius:var(--r);overflow:hidden;background:#0B1220;aspect-ratio:3/4;border:1px solid var(--line)}
+.cam-frame video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.cam-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#C9D7F2;text-align:center;padding:24px;font-size:13.5px;line-height:1.6}
+.hidden{display:none!important}
+.timer-pill{position:absolute;top:12px;left:12px;background:rgba(11,18,32,.7);backdrop-filter:blur(4px);color:#fff;font-weight:800;font-size:14px;border-radius:999px;padding:6px 13px;display:flex;align-items:center;gap:7px}
+.rec-dot{width:9px;height:9px;border-radius:50%;background:#FF4D4D;animation:blink 1s infinite}
+.shot-pill{position:absolute;top:12px;right:12px;background:rgba(11,18,32,.7);color:#fff;font-size:12px;font-weight:700;border-radius:999px;padding:6px 11px}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.flash.on{animation:flash .35s ease}
+@keyframes flash{0%{opacity:.7}100%{opacity:0}}
+.transcript-box{margin-top:12px;background:#fff;border:1px dashed var(--line);border-radius:14px;padding:12px 14px;font-size:13px;color:var(--sub);min-height:48px;line-height:1.6}
+.transcript-box b{color:var(--ink);font-weight:700}
+.rec-controls{margin-top:16px;display:grid;place-items:center}
+.rec-btn{position:relative;width:84px;height:84px;border-radius:50%;border:none;cursor:pointer;background:linear-gradient(135deg,var(--primary),var(--primary-2));color:#fff;display:grid;place-items:center;box-shadow:0 12px 26px rgba(37,99,235,.35);font-family:inherit}
+.rec-btn svg{width:34px;height:34px;z-index:1}
+.rec-btn.recording{background:linear-gradient(135deg,#DC2626,#F87171);box-shadow:0 12px 26px rgba(220,38,38,.35)}
+.rec-hint{text-align:center;font-size:13px;color:var(--sub);margin-top:10px}
+.fallback-note{margin-top:12px;font-size:12.5px;color:var(--sub);text-align:center;line-height:1.6}
+.fallback-note button{background:none;border:none;color:var(--primary);font-weight:700;font-family:inherit;font-size:12.5px;cursor:pointer;text-decoration:underline}
+.thumbs{display:flex;gap:8px;margin-top:12px}
+.thumbs img{width:64px;height:84px;object-fit:cover;border-radius:10px;border:2px solid var(--line)}
+
+#loading{justify-content:center;align-items:center;text-align:center}
+.load-steps{margin-top:26px;display:flex;flex-direction:column;gap:12px;width:100%;max-width:300px}
+.load-step{display:flex;align-items:center;gap:11px;font-size:14px;color:var(--sub);font-weight:500;opacity:.45;transition:opacity .3s}
+.load-step.on{opacity:1;color:var(--ink);font-weight:700}
+.load-step .ic{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:#fff;border:1px solid var(--line);font-size:15px;flex-shrink:0}
+.load-step.on .ic{background:var(--soft);border-color:var(--primary)}
+.load-step.done .ic{background:var(--posture-bg);border-color:var(--posture)}
+
+.score-hero{display:flex;align-items:center;gap:18px;margin-top:14px}
+.ring-wrap{position:relative;width:128px;height:128px;flex-shrink:0}
+.ring-wrap svg{transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:var(--soft);stroke-width:11}
+.ring-fg{fill:none;stroke:url(#ringGrad);stroke-width:11;stroke-linecap:round;transition:stroke-dashoffset 1.2s cubic-bezier(.2,.8,.2,1)}
+.ring-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-num b{font-size:34px;font-weight:900;letter-spacing:-1px}
+.ring-num span{font-size:11px;color:var(--sub);font-weight:700;margin-top:-2px}
+.score-hero .msg{font-size:14px;line-height:1.6;color:var(--sub)}
+.score-hero .msg b{color:var(--ink)}
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.cat{border-radius:16px;padding:13px 12px;text-align:center}
+.cat.posture{background:var(--posture-bg)} .cat.lang{background:var(--lang-bg)} .cat.behavior{background:var(--behavior-bg)}
+.cat .c-name{font-size:12px;font-weight:800}
+.cat.posture .c-name{color:var(--posture)} .cat.lang .c-name{color:var(--lang)} .cat.behavior .c-name{color:var(--behavior)}
+.cat .c-score{font-size:24px;font-weight:900;margin-top:3px}
+.cat .c-bar{height:5px;border-radius:99px;background:rgba(255,255,255,.8);margin-top:8px;overflow:hidden}
+.cat .c-fill{height:100%;border-radius:99px;width:0;transition:width 1s ease .3s}
+.cat.posture .c-fill{background:var(--posture)} .cat.lang .c-fill{background:var(--lang)} .cat.behavior .c-fill{background:var(--behavior)}
+.section{margin-top:18px}
+.section h2{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.feedback-item{display:flex;gap:10px;font-size:13.5px;line-height:1.6;color:var(--ink);padding:10px 0;border-bottom:1px solid var(--line)}
+.feedback-item:last-child{border-bottom:none;padding-bottom:0}
+.feedback-item:first-child{padding-top:0}
+.fb-ic{flex-shrink:0;width:22px;height:22px;border-radius:8px;display:grid;place-items:center;font-size:12px;background:var(--soft)}
+.strength .fb-ic{background:var(--posture-bg)}
+.mission{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1.5px solid var(--line);border-radius:16px;margin-top:10px;cursor:pointer;transition:border-color .15s,background .15s;background:#fff}
+.mission.done{border-color:var(--posture);background:var(--posture-bg)}
+.m-check{width:24px;height:24px;border-radius:8px;border:2px solid var(--line);flex-shrink:0;display:grid;place-items:center;color:#fff;font-size:13px;margin-top:1px;transition:all .15s}
+.mission.done .m-check{background:var(--posture);border-color:var(--posture)}
+.m-body{flex:1}
+.m-cat{font-size:11px;font-weight:800;border-radius:999px;padding:2px 9px;display:inline-block}
+.m-cat.자세{background:var(--posture-bg);color:var(--posture)}
+.m-cat.언어{background:var(--lang-bg);color:var(--lang)}
+.m-cat.행동{background:var(--behavior-bg);color:var(--behavior)}
+.m-title{font-size:14.5px;font-weight:800;margin-top:6px}
+.m-desc{font-size:12.5px;color:var(--sub);margin-top:3px;line-height:1.55}
+.m-pt{font-size:12px;font-weight:800;color:var(--primary);flex-shrink:0}
+.badge-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;border-radius:999px;padding:11px 20px;font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 10px 30px rgba(21,35,63,.35);opacity:0;transition:all .4s cubic-bezier(.2,.8,.2,1);z-index:50;white-space:nowrap}
+.badge-toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.report-actions{margin-top:24px;display:flex;flex-direction:column;gap:10px}
+.footer-note{text-align:center;font-size:11.5px;color:var(--sub);margin-top:26px;line-height:1.7}
+.opinion-card{background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff;border:none}
+.opinion-card h2{color:#fff}
+.opinion-card p{font-size:13px;opacity:.9;line-height:1.6;margin-top:6px}
+.opinion-card .btn{margin-top:14px;background:#fff;color:var(--primary)}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ════════ 1. 홈 ════════ -->
+  <section class="screen active" id="home">
+    <div class="topbar">
+      <div class="logo"><span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 12h.01M9 8v8M14 5v14M19 9v6"/></svg></span>Echo<span class="me">ME</span></div>
+      <span class="trial-tag">체험판</span>
+    </div>
+
+    <div class="echo-wrap" aria-hidden="true">
+      <div class="echo-ring"></div><div class="echo-ring"></div><div class="echo-ring"></div>
+      <div class="echo-core"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-9 8.4 8.5 8.5 0 0 1-3.4-.7L3 21l1.8-5.6a8.38 8.38 0 0 1-.8-3.9 8.5 8.5 0 0 1 8.5-8.5 8.38 8.38 0 0 1 8.5 8.5z"/><path d="M8 11h.01M12 11h.01M16 11h.01"/></svg></div>
+    </div>
+
+    <div style="text-align:center">
+      <div class="eyebrow">2026 WON+PBL 챌린지 · EchoME</div>
+      <h1>나의 자세가<br>나의 대화에 미치는 영향</h1>
+      <p class="sub">20초 동안 질문에 답해 보세요.<br>나의 자세 · 언어 · 행동 습관을 분석해 드립니다.</p>
+    </div>
+
+    <div class="step-row">
+      <div class="step-pill"><div class="s-ic">📷</div><div class="s-tx">대화 촬영</div></div>
+      <div class="step-pill"><div class="s-ic">🔎</div><div class="s-tx">습관 분석</div></div>
+      <div class="step-pill"><div class="s-ic">📋</div><div class="s-tx">리포트</div></div>
+      <div class="step-pill"><div class="s-ic">🎯</div><div class="s-tx">맞춤 미션</div></div>
+    </div>
+
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" id="btnStart" style="margin-top:24px">체험 시작하기</button>
+    <p class="footer-note">촬영 영상과 음성은 기기 안에서만 분석되며 어디에도 저장·전송되지 않습니다.<br>EchoME는 언어재활학과 + 물리치료학과의 전공 융합 프로젝트입니다.</p>
+  </section>
+
+  <!-- ════════ 2. 검사 ════════ -->
+  <section class="screen" id="exam">
+    <div class="topbar">
+      <div class="logo" style="font-size:17px"><span class="logo-mark" style="width:26px;height:26px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 12h.01M9 8v8M14 5v14M19 9v6"/></svg></span>셀프검사</div>
+      <button class="btn-ghost btn" style="width:auto;padding:8px 14px;font-size:13px" id="btnExitExam">나가기</button>
+    </div>
+
+    <div class="question-card">
+      <div class="q-label"><span class="q-dot"></span>AI 대화자의 질문</div>
+      <div class="q-text" id="qText">…</div>
+    </div>
+
+    <div class="cam-frame">
+      <video id="cam" autoplay playsinline muted></video>
+      <div class="cam-overlay" id="camOverlay">
+        <div style="font-size:34px">📷</div>
+        <div>카메라 화면이 여기에 표시됩니다.<br>아래 버튼을 누르면 권한을 요청합니다.</div>
+        <button class="btn btn-primary" style="width:auto;padding:10px 22px;font-size:14px" id="btnCamOn">카메라 켜기</button>
+      </div>
+      <div class="timer-pill hidden" id="timerPill"><span class="rec-dot"></span><span id="timerText">20초</span></div>
+      <div class="shot-pill hidden" id="shotPill">캡처 0/3</div>
+      <div class="flash" id="flash"></div>
+    </div>
+
+    <div class="transcript-box" id="transcriptBox"><b>음성 인식</b> · 녹화를 시작하면 말한 내용이 여기에 표시됩니다.</div>
+    <div class="thumbs hidden" id="thumbs"></div>
+
+    <div class="rec-controls">
+      <button class="rec-btn" id="btnRec" aria-label="녹화 시작">
+        <svg id="recIcon" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg>
+      </button>
+    </div>
+    <p class="rec-hint" id="recHint">버튼을 누르고 질문에 답해 보세요 · 약 20초간 분석합니다</p>
+
+    <div class="fallback-note">
+      카메라 사용이 어렵다면 <button id="btnUpload">사진을 직접 올려서</button> 분석할 수도 있어요.
+      <input type="file" id="fileInput" accept="image/*" multiple hidden>
+    </div>
+    <button class="btn btn-primary hidden" id="btnAnalyzeUpload" style="margin-top:14px">올린 사진으로 분석하기</button>
+  </section>
+
+  <!-- ════════ 3. 분석 중 ════════ -->
+  <section class="screen" id="loading">
+    <div class="echo-wrap">
+      <div class="echo-ring"></div><div class="echo-ring"></div><div class="echo-ring"></div>
+      <div class="echo-core"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg></div>
+    </div>
+    <h2>대화 습관을 분석하고 있어요</h2>
+    <p class="sub" style="text-align:center">촬영된 장면과 말하기 데이터를 살펴보는 중입니다.</p>
+    <div class="load-steps">
+      <div class="load-step" id="ls1"><span class="ic">🧍</span>자세 분석 — 움직임 안정성, 상체 균형</div>
+      <div class="load-step" id="ls2"><span class="ic">💬</span>언어 분석 — 말속도, 반복어·간투사</div>
+      <div class="load-step" id="ls3"><span class="ic">👀</span>행동 분석 — 시선, 제스처 패턴</div>
+      <div class="load-step" id="ls4"><span class="ic">📋</span>맞춤형 미션 구성</div>
+    </div>
+  </section>
+
+  <!-- ════════ 4. 리포트 ════════ -->
+  <section class="screen" id="report">
+    <div class="topbar">
+      <div class="logo" style="font-size:17px"><span class="logo-mark" style="width:26px;height:26px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 12h.01M9 8v8M14 5v14M19 9v6"/></svg></span>분석 리포트</div>
+      <div class="points-chip" aria-live="polite">⭐ <span id="pointsReport">0</span>P</div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">OVERALL</div>
+      <div class="score-hero">
+        <div class="ring-wrap">
+          <svg width="128" height="128" viewBox="0 0 128 128">
+            <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#2563EB"/><stop offset="100%" stop-color="#4F8BFF"/>
+            </linearGradient></defs>
+            <circle class="ring-bg" cx="64" cy="64" r="55"/>
+            <circle class="ring-fg" id="ringFg" cx="64" cy="64" r="55"/>
+          </svg>
+          <div class="ring-num"><b id="totalScore">0</b><span>/ 100</span></div>
+        </div>
+        <div class="msg" id="totalMsg"></div>
+      </div>
+      <div class="cat-grid">
+        <div class="cat posture"><div class="c-name">자세</div><div class="c-score" id="scPosture">–</div><div class="c-bar"><div class="c-fill" id="barPosture"></div></div></div>
+        <div class="cat lang"><div class="c-name">언어</div><div class="c-score" id="scLang">–</div><div class="c-bar"><div class="c-fill" id="barLang"></div></div></div>
+        <div class="cat behavior"><div class="c-name">행동</div><div class="c-score" id="scBehavior">–</div><div class="c-bar"><div class="c-fill" id="barBehavior"></div></div></div>
+      </div>
+    </div>
+
+    <div class="section card">
+      <h2>🌱 잘하고 있는 점</h2>
+      <div id="strengthList"></div>
+    </div>
+
+    <div class="section card">
+      <h2>🔍 주요 피드백</h2>
+      <div id="feedbackList"></div>
+    </div>
+
+    <div class="section">
+      <h2 style="padding:0 2px">🎯 오늘의 맞춤형 미션</h2>
+      <p class="sub" style="margin:-2px 2px 4px;font-size:12.5px">미션을 완료하면 포인트가 적립됩니다. 30P를 모으면 뱃지를 받아요!</p>
+      <div id="missionList"></div>
+    </div>
+
+    <div class="section card opinion-card hidden" id="opinionCard">
+      <h2>💌 EchoME, 어떠셨나요?</h2>
+      <p>여러분의 의견이 EchoME의 다음 버전을 만듭니다.<br>30초만 내어 의견을 남겨 주세요!</p>
+      <button class="btn" id="btnOpinion">의견 남기기</button>
+    </div>
+
+    <div class="report-actions">
+      <button class="btn btn-primary" id="btnRetry">다시 검사하기</button>
+      <button class="btn btn-ghost" id="btnHome">처음으로</button>
+    </div>
+    <p class="footer-note">체험판은 기기 내 간이 분석 알고리즘으로 동작합니다.<br>정식 버전은 AI 기반 영상·음성 통합 분석을 제공할 예정입니다.</p>
+  </section>
+
+  <div class="badge-toast" id="toast">🏅 토스트</div>
+</div>
+
+<script>
+/* ═══════════ 설정 ═══════════
+   의견 수렴용 구글폼 링크를 만들면 아래 따옴표 안에 붙여넣으세요.
+   비워 두면 의견 카드가 표시되지 않습니다. */
+const FEEDBACK_FORM_URL = "";
+
+/* ═══════════ 상태 ═══════════ */
+const $ = id => document.getElementById(id);
+const QUESTIONS = [
+  "간단하게 자기소개를 해 주세요. 요즘 어떻게 지내고 계신가요?",
+  "최근에 가장 기억에 남았던 하루를 이야기해 주세요.",
+  "내가 좋아하는 것 한 가지를 처음 만난 사람에게 소개해 주세요.",
+  "요즘 새로 도전해 보고 싶은 일이 있다면 무엇인가요?",
+  "오늘 이 전시에서 가장 인상 깊었던 것을 말해 주세요."
+];
+let stream=null, frames=[], frameGrays=[], transcript="", recognition=null, speechOK=false;
+let recording=false, timerInt=null, capTimeouts=[], recStartTime=0, recDuration=0;
+let points=0, badgeGiven=false, currentQuestion="";
+const REC_SECONDS=20, CAPTURE_AT=[2,9,16];
+
+/* ═══════════ 화면 전환 ═══════════ */
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $(id).classList.add('active');
+  window.scrollTo({top:0});
+}
+
+/* ═══════════ 홈 → 검사 ═══════════ */
+$('btnStart').onclick = () => {
+  currentQuestion = QUESTIONS[Math.floor(Math.random()*QUESTIONS.length)];
+  $('qText').textContent = currentQuestion;
+  resetExam(); show('exam');
+};
+$('btnExitExam').onclick = () => { stopAll(); show('home'); };
+
+function resetExam(){
+  frames=[]; frameGrays=[]; transcript=""; speechOK=false; recDuration=0;
+  $('thumbs').innerHTML=""; $('thumbs').classList.add('hidden');
+  $('btnAnalyzeUpload').classList.add('hidden');
+  $('transcriptBox').innerHTML="<b>음성 인식</b> · 녹화를 시작하면 말한 내용이 여기에 표시됩니다.";
+  $('timerPill').classList.add('hidden'); $('shotPill').classList.add('hidden');
+  $('shotPill').textContent="캡처 0/3";
+  setRecUI(false);
+}
+
+/* ═══════════ 카메라 ═══════════ */
+$('btnCamOn').onclick = startCamera;
+async function startCamera(){
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:720}}, audio:false});
+    $('cam').srcObject = stream;
+    $('camOverlay').classList.add('hidden');
+  }catch(e){
+    $('camOverlay').innerHTML = '<div style="font-size:30px">🚫</div><div>카메라를 사용할 수 없어요.<br>아래의 <b>사진 올리기</b>로 분석을 진행해 보세요.</div>';
+  }
+}
+
+/* ═══════════ 프레임 캡처 (+움직임 분석용 축소 데이터) ═══════════ */
+function grayFromCanvas(srcCanvas){
+  const c=document.createElement('canvas'); c.width=32; c.height=24;
+  c.getContext('2d').drawImage(srcCanvas,0,0,32,24);
+  const d=c.getContext('2d').getImageData(0,0,32,24).data;
+  const g=new Array(32*24);
+  for(let i=0;i<g.length;i++){ const j=i*4; g[i]=(d[j]+d[j+1]+d[j+2])/3; }
+  return g;
+}
+function captureFrame(){
+  const v=$('cam'); if(!v.videoWidth) return;
+  const W=512, H=Math.round(W*v.videoHeight/v.videoWidth);
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  c.getContext('2d').drawImage(v,0,0,W,H);
+  frames.push(c.toDataURL('image/jpeg',0.72));
+  frameGrays.push(grayFromCanvas(c));
+  $('shotPill').textContent = `캡처 ${Math.min(frames.length,3)}/3`;
+  const f=$('flash'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
+}
+
+/* ═══════════ 음성 인식 ═══════════ */
+function startSpeech(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ $('transcriptBox').innerHTML="<b>음성 인식</b> · 이 브라우저에서는 음성 인식이 지원되지 않아 영상 중심으로 분석합니다."; return; }
+  recognition = new SR();
+  recognition.lang='ko-KR'; recognition.continuous=true; recognition.interimResults=true;
+  recognition.onresult = ev => {
+    speechOK = true;
+    let interim="";
+    for(let i=ev.resultIndex;i<ev.results.length;i++){
+      if(ev.results[i].isFinal) transcript += ev.results[i][0].transcript+" ";
+      else interim += ev.results[i][0].transcript;
+    }
+    $('transcriptBox').innerHTML = "<b>음성 인식</b> · " + (transcript+interim || "말씀해 주세요…");
+  };
+  recognition.onerror = ()=>{};
+  try{ recognition.start(); }catch(e){}
+}
+function stopSpeech(){ if(recognition){ try{recognition.stop();}catch(e){} recognition=null; } }
+
+/* ═══════════ 녹화 ═══════════ */
+$('btnRec').onclick = () => {
+  if(recording){ finishRecording(); return; }
+  if(!stream){ startCamera().then(()=>{ if(stream) beginRecording(); }); return; }
+  beginRecording();
+};
+function beginRecording(){
+  recording=true; frames=[]; frameGrays=[]; transcript=""; speechOK=false;
+  recStartTime=Date.now();
+  setRecUI(true);
+  $('timerPill').classList.remove('hidden');
+  $('shotPill').classList.remove('hidden');
+  $('shotPill').textContent="캡처 0/3";
+  startSpeech();
+  let left=REC_SECONDS;
+  $('timerText').textContent=left+"초";
+  timerInt=setInterval(()=>{
+    left--; $('timerText').textContent=left+"초";
+    if(left<=0) finishRecording();
+  },1000);
+  capTimeouts = CAPTURE_AT.map(t=>setTimeout(captureFrame, t*1000));
+}
+function finishRecording(){
+  if(!recording) return;
+  recording=false;
+  recDuration = Math.max(3, (Date.now()-recStartTime)/1000);
+  clearInterval(timerInt); capTimeouts.forEach(clearTimeout); stopSpeech();
+  if(frames.length===0) captureFrame();
+  setRecUI(false);
+  $('timerPill').classList.add('hidden');
+  if(frames.length===0){
+    $('recHint').textContent="캡처된 장면이 없어요. 카메라를 켠 뒤 다시 시도해 주세요.";
+    return;
+  }
+  runAnalysis();
+}
+function setRecUI(on){
+  $('btnRec').classList.toggle('recording',on);
+  $('btnRec').setAttribute('aria-label', on?'녹화 종료':'녹화 시작');
+  $('recIcon').innerHTML = on ? '<rect x="7" y="7" width="10" height="10" rx="2"/>' : '<circle cx="12" cy="12" r="7"/>';
+  $('recHint').textContent = on ? "답변이 끝나면 버튼을 눌러 바로 분석할 수 있어요" : "버튼을 누르고 질문에 답해 보세요 · 약 20초간 분석합니다";
+}
+function stopAll(){
+  recording=false; clearInterval(timerInt); capTimeouts.forEach(clearTimeout); stopSpeech();
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; $('cam').srcObject=null; $('camOverlay').classList.remove('hidden'); }
+}
+
+/* ═══════════ 사진 업로드 대체 경로 ═══════════ */
+$('btnUpload').onclick = ()=>$('fileInput').click();
+$('fileInput').onchange = async ev => {
+  const files=[...ev.target.files].slice(0,3);
+  if(!files.length) return;
+  frames=[]; frameGrays=[];
+  $('thumbs').innerHTML=""; $('thumbs').classList.remove('hidden');
+  for(const f of files){
+    const c = await downscale(f);
+    frames.push(c.toDataURL('image/jpeg',0.72));
+    frameGrays.push(grayFromCanvas(c));
+    const img=document.createElement('img'); img.src=frames[frames.length-1]; img.alt="업로드한 사진";
+    $('thumbs').appendChild(img);
+  }
+  recDuration=15;
+  $('btnAnalyzeUpload').classList.remove('hidden');
+};
+$('btnAnalyzeUpload').onclick = ()=>{ if(frames.length) runAnalysis(); };
+function downscale(file){
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const W=512, H=Math.round(W*img.height/img.width);
+      const c=document.createElement('canvas'); c.width=W; c.height=H;
+      c.getContext('2d').drawImage(img,0,0,W,H);
+      res(c);
+    };
+    img.src=URL.createObjectURL(file);
+  });
+}
+
+/* ═══════════ 간이 분석 엔진 (기기 내 동작, 외부 전송 없음) ═══════════ */
+const FILLERS = ["어","음","그","이제","막","약간","좀","뭐","그니까","그러니까","아니"];
+function rand(min,max){ return Math.round(min + Math.random()*(max-min)); }
+function pick(arr,n){ const a=[...arr]; const out=[]; while(out.length<n && a.length){ out.push(a.splice(Math.floor(Math.random()*a.length),1)[0]); } return out; }
+function clampScore(n){ return Math.max(50, Math.min(96, Math.round(n))); }
+
+function analyzeLanguage(){
+  const text = transcript.trim();
+  if(!speechOK || text.length < 4){
+    return { score: rand(68,78), facts: [],
+      comments: ["이번 체험에서는 음성이 충분히 인식되지 않아 언어 분석은 기본 평가로 대체되었어요. 조용한 곳에서 또렷하게 말하면 더 정확해집니다."] };
+  }
+  const words = text.replace(/[.,!?~]/g,"").split(/\s+/).filter(Boolean);
+  let fillerCount=0; const fillerFound={};
+  words.forEach(w=>{ if(FILLERS.includes(w)){ fillerCount++; fillerFound[w]=(fillerFound[w]||0)+1; } });
+  const chars = text.replace(/\s/g,"").length;
+  const cps = chars / recDuration;                       // 한국어 평균 발화 약 4~6자/초
+  const sentenceEnds = (text.match(/(요|다|죠|까)\s/g)||[]).length + (/(요|다|죠|까)$/.test(text)?1:0);
+  // 반복 단어(간투사 제외) 탐지
+  const freq={}; words.forEach(w=>{ if(!FILLERS.includes(w)&&w.length>=2) freq[w]=(freq[w]||0)+1; });
+  const repeated = Object.entries(freq).filter(([,c])=>c>=3).map(([w])=>w);
+
+  let score = 86;
+  score -= Math.min(18, fillerCount*3);
+  if(cps < 2.2) score -= 6; else if(cps > 7) score -= 5;
+  if(sentenceEnds >= 2) score += 3;
+  score -= Math.min(6, repeated.length*3);
+  score += rand(-2,2);
+
+  const comments=[];
+  if(fillerCount>=3){
+    const top = Object.entries(fillerFound).sort((a,b)=>b[1]-a[1])[0];
+    comments.push(`간투사가 ${fillerCount}회 감지되었어요. 특히 "${top[0]}"(${top[1]}회)이 자주 나왔는데, 잠깐의 침묵으로 바꾸면 전달력이 좋아집니다.`);
+  } else if(fillerCount>0){
+    comments.push(`간투사가 ${fillerCount}회로 적은 편이에요. 군더더기 없는 말하기를 잘 유지하고 있습니다.`);
+  } else {
+    comments.push("간투사 없이 또렷하게 말했어요. 아주 좋은 언어 습관입니다.");
+  }
+  if(cps < 2.2) comments.push(`말속도가 초당 약 ${cps.toFixed(1)}자로 여유로운 편이에요. 핵심 단어에 힘을 주면 더 생동감 있게 들립니다.`);
+  else if(cps > 7) comments.push(`말속도가 초당 약 ${cps.toFixed(1)}자로 빠른 편이에요. 문장 사이에 한 박자 쉬어 가 보세요.`);
+  else comments.push(`말속도가 초당 약 ${cps.toFixed(1)}자로 듣기 편안한 범위예요.`);
+  if(repeated.length) comments.push(`"${repeated[0]}" 표현이 반복되었어요. 비슷한 뜻의 다른 단어로 바꿔 보면 표현이 풍부해집니다.`);
+
+  return { score: clampScore(score), comments,
+    facts:{fillerCount, cps: cps.toFixed(1), sentenceEnds} };
+}
+
+function motionLevel(){
+  if(frameGrays.length < 2) return null;
+  let total=0, cnt=0;
+  for(let f=1; f<frameGrays.length; f++){
+    let diff=0;
+    for(let i=0;i<frameGrays[f].length;i++) diff += Math.abs(frameGrays[f][i]-frameGrays[f-1][i]);
+    total += diff / frameGrays[f].length; cnt++;
+  }
+  return total/cnt;   // 0(정지)~높을수록 큰 움직임
+}
+
+const POSTURE_POOLS = {
+  stable: { range:[80,92], comments:[
+    "촬영 내내 상체 위치가 안정적으로 유지되었어요. 균형 잡힌 자세가 신뢰감을 줍니다.",
+    "화면 중앙에 일정하게 머무르며 흔들림이 적었어요. 좋은 자세 습관이에요."]},
+  mid: { range:[70,82], comments:[
+    "대체로 안정적이지만 중간에 상체가 조금씩 움직였어요. 어깨를 한 번 펴고 시작하면 더 좋습니다.",
+    "자세 변화가 약간 관찰되었어요. 의자 깊숙이 앉거나 두 발을 바닥에 두면 안정감이 올라갑니다."]},
+  high: { range:[60,74], comments:[
+    "촬영 중 몸의 움직임이 큰 편이었어요. 말하기 전에 어깨와 목의 긴장을 풀어 보세요.",
+    "상체가 자주 흔들렸어요. 화면 속 내 위치를 고정점 삼아 유지해 보는 연습을 추천해요."]}
+};
+const BEHAVIOR_POOLS = {
+  stable: { range:[78,90], comments:[
+    "시선과 움직임이 차분하게 유지되었어요. 듣는 사람이 편안함을 느낄 수 있는 태도예요.",
+    "불필요한 동작 없이 대화에 집중하는 모습이 좋았어요."]},
+  mid: { range:[70,82], comments:[
+    "가벼운 움직임이 간간이 보였어요. 손을 무릎이나 책상 위에 두면 한결 정돈되어 보입니다.",
+    "전체적으로 무난하지만, 카메라(상대의 눈)를 조금 더 자주 봐 주면 좋아요."]},
+  high: { range:[60,74], comments:[
+    "움직임이 잦아 다소 산만해 보일 수 있어요. 말하는 동안 한 지점을 바라보는 연습을 해 보세요.",
+    "제스처가 큰 편이에요. 강조하고 싶은 순간에만 사용하면 효과가 더 커집니다."]}
+};
+const STRENGTH_POOL = [
+  "끝까지 답변을 완성하려는 태도가 좋았어요. 꾸준함이 대화 자신감의 출발점입니다.",
+  "질문에 자신의 이야기를 담아 답한 점이 인상적이에요.",
+  "체험에 적극적으로 참여한 것 자체가 자기 인식의 첫걸음이에요.",
+  "카메라 앞에서도 끝까지 말을 이어간 점이 훌륭해요."
+];
+const MISSION_POOL = {
+  "자세 개선": [
+    {title:"어깨 리셋", desc:"대화 전 어깨를 귀까지 올렸다가 툭 떨어뜨리기를 3회 해 보세요."},
+    {title:"발바닥 접지", desc:"앉아서 말할 때 두 발을 바닥에 붙이면 상체가 저절로 안정됩니다."},
+    {title:"턱 살짝 당기기", desc:"화면을 볼 때 턱을 살짝 당기면 목·어깨 정렬이 좋아져요."}
+  ],
+  "언어습관 개선": [
+    {title:"3초 생각 후 말하기", desc:"답하기 전 속으로 셋을 세면 간투사가 줄어듭니다."},
+    {title:"문장 끝맺기", desc:"오늘 대화에서 문장을 '~요/~다'로 끝까지 맺어 보세요."},
+    {title:"한 박자 쉼표", desc:"문장과 문장 사이에 의식적으로 한 박자 쉬어 보세요."}
+  ],
+  "행동 개선": [
+    {title:"시선 3초 유지", desc:"상대(또는 카메라)를 3초씩 바라보는 연습을 해 보세요."},
+    {title:"손 자리 정하기", desc:"말할 때 손의 기본 위치를 정해 두면 산만함이 줄어요."},
+    {title:"거울 1분 대화", desc:"하루 1분, 거울 속 나와 눈을 맞추며 말해 보세요."}
+  ]
+};
+
+function runAnalysis(){
+  stopAll();
+  show('loading');
+  ['ls1','ls2','ls3','ls4'].forEach((id,i)=>{
+    setTimeout(()=>{ $(id).classList.add('on'); if(i>0){ $('ls'+i).classList.add('done'); $('ls'+i).querySelector('.ic').textContent='✓'; } }, 500+i*1100);
+  });
+
+  // 실제 계산은 즉시, 표시만 연출 시간 뒤에
+  const lang = analyzeLanguage();
+  const m = motionLevel();
+  let level = 'mid';
+  if(m !== null){ level = m < 7 ? 'stable' : (m < 18 ? 'mid' : 'high'); }
+  const pPool = POSTURE_POOLS[level], bPool = BEHAVIOR_POOLS[level];
+  const posture = { score: clampScore(rand(pPool.range[0],pPool.range[1])), comments: pick(pPool.comments,1) };
+  const behavior = { score: clampScore(rand(bPool.range[0],bPool.range[1])), comments: pick(bPool.comments,1) };
+  const total = Math.round(posture.score*0.35 + lang.score*0.35 + behavior.score*0.30);
+
+  // 가장 낮은 영역의 미션을 앞에 배치
+  const order = [["자세 개선",posture.score],["언어습관 개선",lang.score],["행동 개선",behavior.score]]
+    .sort((a,b)=>a[1]-b[1]).map(x=>x[0]);
+  const missions = order.map(cat=>({ category:cat, ...pick(MISSION_POOL[cat],1)[0] }));
+
+  const result = {
+    total, posture, language:lang, behavior,
+    strengths: pick(STRENGTH_POOL,2),
+    feedback: [...lang.comments, ...posture.comments, ...behavior.comments].slice(0,5),
+    missions
+  };
+  setTimeout(()=>renderReport(result), 5200);
+}
+
+/* ═══════════ 리포트 렌더링 ═══════════ */
+function renderReport(r){
+  show('report');
+  const total=r.total;
+  const C=2*Math.PI*55;
+  const ring=$('ringFg');
+  ring.style.strokeDasharray=C; ring.style.strokeDashoffset=C;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ ring.style.strokeDashoffset=C*(1-total/100); }));
+  animateNum($('totalScore'),total);
+  $('totalMsg').innerHTML = total>=85 ? "<b>훌륭해요!</b> 안정적인 태도로 대화하고 있어요. 미션으로 강점을 더 다져 보세요."
+    : total>=70 ? "<b>좋은 출발이에요.</b> 몇 가지 습관만 다듬으면 대화가 한층 편안해질 거예요."
+    : "<b>지금부터 시작이에요.</b> 작은 미션부터 하나씩 실천해 볼까요?";
+  setCat('Posture',r.posture.score); setCat('Lang',r.language.score); setCat('Behavior',r.behavior.score);
+  $('strengthList').innerHTML = r.strengths.map(s=>`<div class="feedback-item strength"><span class="fb-ic">✦</span><span>${esc(s)}</span></div>`).join("");
+  $('feedbackList').innerHTML = r.feedback.map(s=>`<div class="feedback-item"><span class="fb-ic">›</span><span>${esc(s)}</span></div>`).join("");
+  $('missionList').innerHTML = r.missions.map((m,i)=>{
+    const catKey = m.category.includes("자세")?"자세":m.category.includes("언어")?"언어":"행동";
+    return `<div class="mission" data-i="${i}" tabindex="0" role="checkbox" aria-checked="false">
+      <div class="m-check">✓</div>
+      <div class="m-body">
+        <span class="m-cat ${catKey}">${esc(m.category)}</span>
+        <div class="m-title">${esc(m.title)}</div>
+        <div class="m-desc">${esc(m.desc)}</div>
+      </div>
+      <span class="m-pt">+10P</span>
+    </div>`;
+  }).join("");
+  document.querySelectorAll('.mission').forEach(el=>{
+    const toggle=()=>{
+      const done=el.classList.toggle('done');
+      el.setAttribute('aria-checked',done);
+      points += done?10:-10;
+      $('pointsReport').textContent=points;
+      if(done) toast("✅ 미션 완료! +10P 적립");
+      if(points>=30 && !badgeGiven){ badgeGiven=true; setTimeout(()=>toast("🏅 '대화 성장' 뱃지를 획득했어요!"),900); }
+    };
+    el.onclick=toggle;
+    el.onkeydown=e=>{ if(e.key===" "||e.key==="Enter"){ e.preventDefault(); toggle(); } };
+  });
+  if(FEEDBACK_FORM_URL){
+    $('opinionCard').classList.remove('hidden');
+    $('btnOpinion').onclick=()=>window.open(FEEDBACK_FORM_URL,'_blank');
+  }
+}
+function setCat(suffix,score){
+  $('sc'+suffix).textContent=score;
+  setTimeout(()=>{ $('bar'+suffix).style.width=score+"%"; },150);
+}
+
+/* ═══════════ 유틸 ═══════════ */
+function animateNum(el,target){
+  let cur=0; const step=Math.max(1,Math.round(target/40));
+  const t=setInterval(()=>{ cur+=step; if(cur>=target){cur=target;clearInterval(t);} el.textContent=cur; },24);
+}
+function esc(s){ return String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+let toastT=null;
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2400);
+}
+$('btnRetry').onclick=()=>{ $('qText').textContent=currentQuestion=QUESTIONS[Math.floor(Math.random()*QUESTIONS.length)]; resetExam(); show('exam'); };
+$('btnHome').onclick=()=>show('home');
+</script>
+</body>
+</html>
