@@ -469,6 +469,23 @@ h2{font-size:17px;font-weight:800;letter-spacing:-.3px}
 </div>
 
 <script>
+/* ═══════════ 인앱 브라우저 탈출 (권한 팝업 반복 방지) ═══════════
+   카카오톡/라인 인앱 브라우저는 카메라·마이크 권한을 기억하지 못해
+   답변마다 권한 창이 뜨므로, 기본 브라우저(Chrome 등)로 자동 전환한다. */
+(function(){
+  try{
+    const ua = navigator.userAgent.toLowerCase();
+    const url = location.href;
+    if(ua.indexOf('kakaotalk') > -1){
+      location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
+      return;
+    }
+    if(ua.indexOf(' line/') > -1){
+      location.href = url + (url.indexOf('?') > -1 ? '&' : '?') + 'openExternalBrowser=1';
+    }
+  }catch(e){}
+})();
+
 /* ═══════════ 설정 ═══════════
    의견 수렴용 구글폼 링크를 만들면 아래 따옴표 안에 붙여넣으세요.
    비워 두면 의견 카드가 표시되지 않습니다. */
@@ -673,7 +690,13 @@ $('btnPipCamOn').onclick = startCamera;
 async function startCamera(){
   try{
     if(!stream){
-      stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:720}}, audio:false});
+      /* 카메라+마이크 권한을 한 번에 요청 → 음성 인식 시 마이크 팝업 반복 방지
+         (video 요소는 muted라 마이크 트랙이 있어도 하울링 없음) */
+      try{
+        stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:720}}, audio:true});
+      }catch(errWithAudio){
+        stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:720}}, audio:false});
+      }
     }
     activeVideo().srcObject = stream;
     $('camOverlay').classList.add('hidden');
@@ -712,6 +735,7 @@ function captureFrame(){
 
 /* ═══════════ 음성 인식 ═══════════ */
 function transcriptBoxEl(){ return mode==='self' ? $('selfTranscriptBox') : $('transcriptBox'); }
+let speechWanted = false;   // 세션 중 음성 인식을 유지할지 여부
 function startSpeech(){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR){
@@ -719,29 +743,38 @@ function startSpeech(){
     else transcriptBoxEl().innerHTML="<b>음성 인식</b> · 이 브라우저에서는 음성 인식이 지원되지 않아 영상 중심으로 분석합니다.";
     return;
   }
-  recognition = new SR();
-  recognition.lang='ko-KR'; recognition.continuous=true; recognition.interimResults=true;
-  recognition.onresult = ev => {
-    speechOK = true;
-    let interim="";
-    for(let i=ev.resultIndex;i<ev.results.length;i++){
-      const phrase = (ev.results[i][0].transcript || "").trim();
-      if(!phrase) continue;
-      if(ev.results[i].isFinal){
-        const normalized = transcript.replace(/\s+/g,' ').trim();
-        if(!normalized.endsWith(phrase)) transcript += phrase + " ";
-      } else {
-        interim += phrase + " ";
+  speechWanted = true;
+  /* 인스턴스를 답변마다 새로 만들지 않고 세션 동안 재사용 → 마이크 권한 팝업 반복 방지 */
+  if(!recognition){
+    recognition = new SR();
+    recognition.lang='ko-KR'; recognition.continuous=true; recognition.interimResults=true;
+    recognition.onresult = ev => {
+      if(!recording) return;   // 답변 중일 때만 수집
+      speechOK = true;
+      let interim="";
+      for(let i=ev.resultIndex;i<ev.results.length;i++){
+        const phrase = (ev.results[i][0].transcript || "").trim();
+        if(!phrase) continue;
+        if(ev.results[i].isFinal){
+          const normalized = transcript.replace(/\s+/g,' ').trim();
+          if(!normalized.endsWith(phrase)) transcript += phrase + " ";
+        } else {
+          interim += phrase + " ";
+        }
       }
-    }
-    const live = compactText((transcript + interim).trim(), mode==='self' ? 70 : 260);
-    if(mode==='self') transcriptBoxEl().innerHTML = "<b>내 답변 듣는 중</b>";
-    else transcriptBoxEl().innerHTML = "<b>음성 인식</b> · " + esc(live || "말씀해 주세요…");
-  };
-  recognition.onerror = ()=>{};
+      const live = compactText((transcript + interim).trim(), mode==='self' ? 70 : 260);
+      if(mode==='self') transcriptBoxEl().innerHTML = "<b>내 답변 듣는 중</b>";
+      else transcriptBoxEl().innerHTML = "<b>음성 인식</b> · " + esc(live || "말씀해 주세요…");
+    };
+    recognition.onend = () => {
+      /* 세션이 살아 있는 동안 끊기면 자동 재시작 (재시작은 권한 팝업을 띄우지 않음) */
+      if(speechWanted && recognition){ try{ recognition.start(); }catch(e){} }
+    };
+    recognition.onerror = ()=>{};
+  }
   try{ recognition.start(); }catch(e){}
 }
-function stopSpeech(){ if(recognition){ try{recognition.stop();}catch(e){} recognition=null; } }
+function stopSpeech(){ speechWanted=false; if(recognition){ try{recognition.onend=null; recognition.stop();}catch(e){} recognition=null; } }
 
 /* ═══════════ 녹화 (다이얼로그 버전) ═══════════ */
 $('btnRec').onclick = () => {
@@ -781,7 +814,9 @@ function finishRecording(){
   if(!recording) return;
   recording=false;
   recDuration += Math.max(3, (Date.now()-recStartTime)/1000);
-  clearInterval(timerInt); capTimeouts.forEach(clearTimeout); stopSpeech();
+  clearInterval(timerInt); capTimeouts.forEach(clearTimeout);
+  /* stopSpeech()를 호출하지 않음: 인식 엔진을 세션 동안 유지해야
+     다음 답변에서 마이크 권한 팝업이 다시 뜨지 않는다. (recording=false라 수집은 자동 중단) */
   if(frames.length===0) captureFrame();
 
   if(mode==='self'){
