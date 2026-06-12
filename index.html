@@ -598,9 +598,10 @@ function enterSelfExam(){
   currentQuestion = SELF_QUESTIONS[0];
   $('selfQText').textContent = currentQuestion;
   $('selfQCount').textContent = `질문 1/${SELF_QUESTIONS.length}`;
-  /* 카메라·마이크 권한 창이 음성 재생을 끊지 않도록,
-     권한 처리(허용/거부)가 끝난 뒤에 첫 질문을 재생 */
-  startCamera().then(()=> setSelfQuestion());
+  /* 카메라 권한 처리와 화면 전환이 끝난 뒤 질문 음성을 재생한다.
+     첫 음성이 권한 창/화면 렌더링과 겹치며 앞부분이 잘리는 현상을 줄이기 위함. */
+  preloadSelfQuestionAudio();
+  startCamera().then(()=> setTimeout(setSelfQuestion, 260));
 }
 $('btnExitSelf').onclick = () => { stopAll(); show('home'); };
 
@@ -623,71 +624,115 @@ const SELF_QUESTION_AUDIO = [
 ];
 
 let currentQuestionAudio = null;
+let selfAudioPlayTimer = null;
+let selfAudioToken = 0;
+let selfAudioPreloaded = false;
+
+function clearQuestionAudioTimer(){
+  if(selfAudioPlayTimer){
+    clearTimeout(selfAudioPlayTimer);
+    selfAudioPlayTimer = null;
+  }
+}
 
 function stopQuestionAudio(){
+  selfAudioToken++;
+  clearQuestionAudioTimer();
   if(currentQuestionAudio){
     try{
       currentQuestionAudio.pause();
       currentQuestionAudio.currentTime = 0;
+      currentQuestionAudio.removeAttribute('src');
+      currentQuestionAudio.load();
     }catch(e){}
     currentQuestionAudio = null;
   }
 }
 
+function preloadSelfQuestionAudio(){
+  if(selfAudioPreloaded) return;
+  selfAudioPreloaded = true;
+  try{
+    SELF_QUESTION_AUDIO.forEach(src => {
+      const a = new Audio();
+      a.preload = 'auto';
+      a.src = src;
+      a.load();
+    });
+  }catch(e){}
+}
+
 function aiSpeak(text){
   stopQuestionAudio();
+  const src = SELF_QUESTION_AUDIO[selfQIdx];
   setAIState('speaking','에코가 질문하는 중');
 
-  const src = SELF_QUESTION_AUDIO[selfQIdx];
   if(!src){
-    setTimeout(()=>setAIState('happy','답변을 기다리는 중'), 1400);
+    setTimeout(()=>setAIState('happy','답변을 기다리는 중'), 1000);
     return;
   }
 
-  const audio = new Audio(src);
+  const audio = new Audio();
+  const token = selfAudioToken;
   currentQuestionAudio = audio;
   audio.preload = 'auto';
+  audio.volume = 1;
+  audio.src = src;
+
   audio.onended = () => {
-    if(currentQuestionAudio === audio) currentQuestionAudio = null;
+    if(token !== selfAudioToken || currentQuestionAudio !== audio) return;
+    currentQuestionAudio = null;
     setAIState('happy','답변을 기다리는 중');
   };
   audio.onerror = () => {
-    if(currentQuestionAudio === audio) currentQuestionAudio = null;
+    if(token !== selfAudioToken || currentQuestionAudio !== audio) return;
+    currentQuestionAudio = null;
     setAIState('happy','질문 다시 듣기를 눌러 주세요');
   };
 
-  const playPromise = audio.play();
-  if(playPromise && typeof playPromise.catch === 'function'){
-    playPromise.catch(() => {
-      if(currentQuestionAudio === audio) currentQuestionAudio = null;
-      setAIState('happy','질문 다시 듣기를 눌러 주세요');
-      $('selfTranscriptBox').innerHTML = "<b>에코의 질문</b><span class='small'>자동 재생이 막혔어요. ‘질문 다시 듣기’를 눌러 음성을 재생해 주세요.</span>";
-    });
-  }
+  /* 다음 질문 전환 직후에는 직전 마이크/타이머 정리음과 겹칠 수 있어 짧게 간격을 둔다. */
+  clearQuestionAudioTimer();
+  selfAudioPlayTimer = setTimeout(() => {
+    selfAudioPlayTimer = null;
+    if(token !== selfAudioToken || currentQuestionAudio !== audio) return;
+    try{ audio.currentTime = 0; }catch(e){}
+    const playPromise = audio.play();
+    if(playPromise && typeof playPromise.catch === 'function'){
+      playPromise.catch(() => {
+        if(token !== selfAudioToken || currentQuestionAudio !== audio) return;
+        currentQuestionAudio = null;
+        setAIState('happy','질문 다시 듣기를 눌러 주세요');
+        $('selfTranscriptBox').innerHTML = "<b>에코의 질문</b><span class='small'>자동 재생이 막혔어요. ‘질문 다시 듣기’를 눌러 음성을 재생해 주세요.</span>";
+      });
+    }
+  }, 260);
 }
+
 function setSelfQuestion(){
+  stopQuestionAudio();
   currentQuestion = SELF_QUESTIONS[selfQIdx];
   $('selfQText').textContent = currentQuestion;
   $('selfQCount').textContent = `질문 ${selfQIdx+1}/${SELF_QUESTIONS.length}`;
-  $('selfTranscriptBox').innerHTML = "<b>에코의 질문</b><span class='small'>소리가 들리지 않으면 ‘질문 다시 듣기’를 눌러 주세요. 질문을 들은 뒤 답변 시작을 눌러 주세요.</span>";
+  $('selfTranscriptBox').innerHTML = "<b>에코의 질문</b><span class='small'>질문을 들은 뒤 답변 시작을 눌러 주세요.</span>";
   aiSpeak(currentQuestion);
 }
+
 $('btnSelfNext').onclick = () => {
   if(recording) finishRecording();
   if(selfQIdx < SELF_QUESTIONS.length-1){
     selfQIdx++;
-    setSelfQuestion();
     $('btnSelfNext').disabled = true;
     $('selfHint').textContent = "AI의 질문에 영상통화하듯 자연스럽게 답해 보세요";
+    setTimeout(setSelfQuestion, 260);
   }
 };
 $('btnSelfAnswer').onclick = () => {
   if(recording){ finishRecording(); return; }
-  if(!stream){ startCamera().then(()=>{ if(stream) beginRecording(); else beginRecording(); }); return; }
+  if(!stream){ startCamera().then(()=>{ beginRecording(); }); return; }
   beginRecording();
 };
 $('btnSelfAnalyze').onclick = () => { if(frames.length || transcript.trim()) runAnalysis(); };
-$('btnReplayQuestion').onclick = () => { aiSpeak(currentQuestion, {fromUser:true}); };
+$('btnReplayQuestion').onclick = () => { aiSpeak(currentQuestion); };
 
 /* ═══════════ 카메라 ═══════════ */
 $('btnCamOn').onclick = startCamera;
@@ -695,12 +740,17 @@ $('btnPipCamOn').onclick = startCamera;
 async function startCamera(){
   try{
     if(!stream){
-      /* 카메라+마이크 권한을 한 번에 요청 → 음성 인식 시 마이크 팝업 반복 방지
-         (video 요소는 muted라 마이크 트랙이 있어도 하울링 없음) */
-      try{
-        stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:720}}, audio:true});
-      }catch(errWithAudio){
+      if(mode==='self'){
+        /* 셀프모드는 질문 음성과 답변 타이머가 핵심이므로 마이크 트랙을 열지 않는다.
+           모바일 브라우저에서 마이크/음성인식 효과음이 20초 카운트 중 반복되는 문제를 막기 위함. */
         stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:720}}, audio:false});
+      }else{
+        /* 다이얼로그 버전은 음성 인식 권한을 안정적으로 확보하기 위해 마이크를 함께 요청한다. */
+        try{
+          stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:720}}, audio:true});
+        }catch(errWithAudio){
+          stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:720}}, audio:false});
+        }
       }
     }
     activeVideo().srcObject = stream;
@@ -742,6 +792,14 @@ function captureFrame(){
 function transcriptBoxEl(){ return mode==='self' ? $('selfTranscriptBox') : $('transcriptBox'); }
 let speechWanted = false;   // 세션 중 음성 인식을 유지할지 여부
 function startSpeech(){
+  if(mode==='self'){
+    /* 셀프모드에서는 브라우저 음성인식을 사용하지 않는다.
+       일부 모바일 환경에서 음성인식 시작/유지/종료음이 반복되어 질문 음성을 방해하기 때문이다. */
+    speechWanted = false;
+    speechOK = false;
+    transcriptBoxEl().innerHTML = "<b>내 답변 기록 중</b><span class='small'>답변 시간과 화면 흐름을 기록하고 있어요.</span>";
+    return;
+  }
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR){
     if(mode==='self') transcriptBoxEl().innerHTML="<b>내 답변 듣는 중</b>";
@@ -781,7 +839,11 @@ function startSpeech(){
   try{ recognition.start(); }catch(e){}
 }
 /* 답변 종료 시: 인식 엔진은 유지하고 듣기만 멈춤 (마이크 트랙이 살아 있어 권한 팝업 없음) */
-function pauseSpeech(){ speechWanted=false; if(recognition){ try{ recognition.stop(); }catch(e){} } }
+function pauseSpeech(){
+  speechWanted=false;
+  if(mode==='self') return;
+  if(recognition){ try{ recognition.stop(); }catch(e){} }
+}
 function stopSpeech(){ speechWanted=false; if(recognition){ try{recognition.onend=null; recognition.stop();}catch(e){} recognition=null; } }
 
 /* ═══════════ 녹화 (다이얼로그 버전) ═══════════ */
