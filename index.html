@@ -741,8 +741,10 @@ async function startCamera(){
   try{
     if(!stream){
       if(mode==='self'){
-        /* 셀프모드는 질문 음성과 답변 타이머가 핵심이므로 마이크 트랙을 열지 않는다.
-           모바일 브라우저에서 마이크/음성인식 효과음이 20초 카운트 중 반복되는 문제를 막기 위함. */
+        /* 셀프모드는 카메라 영상만 연다. 마이크를 함께 점유하면 안드로이드가
+           통화형 오디오 모드로 전환되어 질문 MP3가 튀게 들리고,
+           음성인식이 마이크를 못 가져가 자막이 안 나오는 충돌이 생긴다.
+           마이크는 음성인식이 답변 중에만 단독으로 사용한다. */
         stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:{ideal:720}}, audio:false});
       }else{
         /* 다이얼로그 버전은 음성 인식 권한을 안정적으로 확보하기 위해 마이크를 함께 요청한다. */
@@ -791,22 +793,16 @@ function captureFrame(){
 /* ═══════════ 음성 인식 ═══════════ */
 function transcriptBoxEl(){ return mode==='self' ? $('selfTranscriptBox') : $('transcriptBox'); }
 let speechWanted = false;   // 세션 중 음성 인식을 유지할지 여부
+let speechBase = "";        // 이번 인식 세션 시작 시점까지 확정돼 있던 텍스트
 function startSpeech(){
-  if(mode==='self'){
-    /* 셀프모드에서는 브라우저 음성인식을 사용하지 않는다.
-       일부 모바일 환경에서 음성인식 시작/유지/종료음이 반복되어 질문 음성을 방해하기 때문이다. */
-    speechWanted = false;
-    speechOK = false;
-    transcriptBoxEl().innerHTML = "<b>내 답변 기록 중</b><span class='small'>답변 시간과 화면 흐름을 기록하고 있어요.</span>";
-    return;
-  }
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR){
-    if(mode==='self') transcriptBoxEl().innerHTML="<b>내 답변 듣는 중</b>";
+    if(mode==='self') transcriptBoxEl().innerHTML="<b>내 답변 기록 중</b><span class='small'>이 브라우저는 음성 인식을 지원하지 않아 답변 시간과 화면 흐름을 기록해요.</span>";
     else transcriptBoxEl().innerHTML="<b>음성 인식</b> · 이 브라우저에서는 음성 인식이 지원되지 않아 영상 중심으로 분석합니다.";
     return;
   }
   speechWanted = true;
+  speechBase = transcript;   // 셀프모드는 답변이 누적되므로 지금까지의 확정 텍스트를 기준점으로 저장
   /* 인스턴스를 답변마다 새로 만들지 않고 세션 동안 재사용 → 마이크 권한 팝업 반복 방지 */
   if(!recognition){
     recognition = new SR();
@@ -814,19 +810,19 @@ function startSpeech(){
     recognition.onresult = ev => {
       if(!recording) return;   // 답변 중일 때만 수집
       speechOK = true;
-      let interim="";
-      for(let i=ev.resultIndex;i<ev.results.length;i++){
+      /* 중복 방지의 핵심: 결과를 이어 붙이지 않고, 이번 세션의 전체 결과(ev.results)를
+         매번 처음부터 다시 조립한다. 확정 문장은 순번별로 한 번씩만, 임시 결과는
+         항상 현재 것만 반영되므로 같은 말이 겹겹이 쌓이지 않는다. */
+      let finals="", interim="";
+      for(let i=0;i<ev.results.length;i++){
         const phrase = (ev.results[i][0].transcript || "").trim();
         if(!phrase) continue;
-        if(ev.results[i].isFinal){
-          const normalized = transcript.replace(/\s+/g,' ').trim();
-          if(!normalized.endsWith(phrase)) transcript += phrase + " ";
-        } else {
-          interim += phrase + " ";
-        }
+        if(ev.results[i].isFinal) finals += phrase + " ";
+        else interim += phrase + " ";
       }
-      const live = compactText((transcript + interim).trim(), mode==='self' ? 70 : 260);
-      if(mode==='self') transcriptBoxEl().innerHTML = "<b>내 답변 듣는 중</b>";
+      transcript = speechBase + finals;
+      const live = compactText((transcript + interim).trim(), mode==='self' ? 90 : 260);
+      if(mode==='self') transcriptBoxEl().innerHTML = "<b>내 답변 듣는 중</b><span class='small'>" + esc(live || "말씀해 주세요…") + "</span>";
       else transcriptBoxEl().innerHTML = "<b>음성 인식</b> · " + esc(live || "말씀해 주세요…");
     };
     recognition.onend = () => {
@@ -841,7 +837,6 @@ function startSpeech(){
 /* 답변 종료 시: 인식 엔진은 유지하고 듣기만 멈춤 (마이크 트랙이 살아 있어 권한 팝업 없음) */
 function pauseSpeech(){
   speechWanted=false;
-  if(mode==='self') return;
   if(recognition){ try{ recognition.stop(); }catch(e){} }
 }
 function stopSpeech(){ speechWanted=false; if(recognition){ try{recognition.onend=null; recognition.stop();}catch(e){} recognition=null; } }
